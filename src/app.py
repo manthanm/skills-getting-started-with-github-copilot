@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
+import re
 from pathlib import Path
 
 app = FastAPI(title="Mergington High School API",
@@ -83,6 +84,73 @@ def root():
     return RedirectResponse(url="/static/index.html")
 
 
+# Day name mapping for schedule parsing
+DAY_NAMES = {
+    "mondays": "monday", "monday": "monday",
+    "tuesdays": "tuesday", "tuesday": "tuesday",
+    "wednesdays": "wednesday", "wednesday": "wednesday",
+    "thursdays": "thursday", "thursday": "thursday",
+    "fridays": "friday", "friday": "friday",
+}
+
+
+def parse_time_to_minutes(time_str):
+    """Convert a time string like '3:30 PM' to minutes since midnight."""
+    match = re.match(r"(\d{1,2}):(\d{2})\s*(AM|PM)", time_str.strip(), re.IGNORECASE)
+    if not match:
+        return 0
+    hours, minutes, period = int(match.group(1)), int(match.group(2)), match.group(3).upper()
+    if period == "PM" and hours != 12:
+        hours += 12
+    elif period == "AM" and hours == 12:
+        hours = 0
+    return hours * 60 + minutes
+
+
+def parse_schedule(schedule_str):
+    """Parse a schedule string into a set of (day, start_minutes, end_minutes) tuples."""
+    # Split into days part and time part at the last comma before the time range
+    match = re.match(r"(.+),\s*(\d{1,2}:\d{2}\s*[AP]M\s*-\s*\d{1,2}:\d{2}\s*[AP]M)", schedule_str, re.IGNORECASE)
+    if not match:
+        return set()
+
+    days_part = match.group(1)
+    time_part = match.group(2)
+
+    start_str, end_str = time_part.split("-")
+    start = parse_time_to_minutes(start_str)
+    end = parse_time_to_minutes(end_str)
+
+    # Extract day names
+    slots = set()
+    for word in re.split(r"[,\s]+", days_part.lower()):
+        word = word.strip()
+        if word in DAY_NAMES:
+            slots.add((DAY_NAMES[word], start, end))
+
+    return slots
+
+
+def find_schedule_conflict(email, target_activity_name):
+    """Check if a student has a schedule conflict with the target activity."""
+    target_slots = parse_schedule(activities[target_activity_name]["schedule"])
+    if not target_slots:
+        return None
+
+    for name, details in activities.items():
+        if name == target_activity_name:
+            continue
+        if email not in details["participants"]:
+            continue
+
+        existing_slots = parse_schedule(details["schedule"])
+        for t_day, t_start, t_end in target_slots:
+            for e_day, e_start, e_end in existing_slots:
+                if t_day == e_day and t_start < e_end and e_start < t_end:
+                    return name
+    return None
+
+
 @app.get("/activities")
 def get_activities():
     return activities
@@ -101,6 +169,14 @@ def signup_for_activity(activity_name: str, email: str):
     # Validate student is not already signed up
     if email in activity["participants"]:
         raise HTTPException(status_code=400, detail="Student already signed up for this activity")
+
+    # Check for schedule conflicts with other enrolled activities
+    conflicting = find_schedule_conflict(email, activity_name)
+    if conflicting:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Schedule conflict with {conflicting}"
+        )
 
     # Add student
     activity["participants"].append(email)
