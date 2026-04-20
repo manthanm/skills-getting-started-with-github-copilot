@@ -3,3 +3,4 @@ uvicorn
 httpx
 watchfiles
 pytest
+pytest-cov
