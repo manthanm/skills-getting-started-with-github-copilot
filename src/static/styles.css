@@ -136,6 +136,50 @@ button:hover {
   display: none;
 }
 
+.participants-section {
+  margin-top: 10px;
+}
+
+.participants-list {
+  list-style: none;
+  margin-top: 6px;
+  padding: 0;
+}
+
+.participant-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background-color: #eef2ff;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.unregister-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #c62828;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.unregister-btn:hover {
+  color: #b71c1c;
+  background: none;
+}
+
+.no-participants {
+  font-style: italic;
+  color: #888;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
 footer {
   text-align: center;
   margin-top: 30px;
